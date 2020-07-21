@@ -394,7 +394,6 @@ def volmesh_cell_subdivide_barycentric(volmesh, ckey):
 
     for hfkey in halffaces:
         cell_halffaces = [volmesh.halfface_vertices(hfkey)]
-
         halfedges = volmesh.halfface_halfedges(hfkey)
 
         for u, v in halfedges:

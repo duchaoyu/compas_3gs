@@ -8,6 +8,7 @@ from compas.geometry import dot_vectors
 from compas.geometry import distance_point_point
 from compas.geometry import midpoint_point_point
 from compas.geometry import intersection_line_plane
+import compas.geometry as cg
 
 from compas_3gs.diagrams import EGI
 
@@ -24,6 +25,8 @@ __all__ = ['cell_split_indet_face_vertices',
            'cell_relocate_face',
            'cell_face_subdivide_barycentric',
            'cell_merge_coplanar_adjacent_faces',
+           'cell_subdivide_barycentric', 
+
            'check_cell_convexity']
 
 
@@ -262,7 +265,6 @@ def cell_face_subdivide_barycentric(cell, fkey, cls=None):
 
     cells = []
     descendant = {i: j for i, j in cell.face_halfedges(fkey)}
-    # ancestor = {j: i for i, j in cell.face_halfedges(fkey)}
 
     f_vkeys = cell.face_vertices(fkey)
     other_vkeys = [vkey for vkey in cell.vertices() if vkey not in f_vkeys]
@@ -276,8 +278,8 @@ def cell_face_subdivide_barycentric(cell, fkey, cls=None):
             face_2 = [vertices_dict[d], vertices_dict[vkey], vertices_dict[end_key]]
             face_3 = [vertices_dict[vkey], f_center_key, vertices_dict[end_key]]
             face_4 = [f_center_key, vertices_dict[d], vertices_dict[end_key]]
-            cell = [face_1, face_2, face_3, face_4]
-            cells.append(cell)
+            faces = [face_1, face_2, face_3, face_4]
+            cells.append(faces)
 
     print(cells)
     return cls.from_vertices_and_cells(vertices, cells)
@@ -291,7 +293,6 @@ def check_cell_convexity(cell):
     The signs must be the same.
 
     """
-    import compas.geometry as cg
     vkeys = cell.vertices()
     for fkey in cell.faces():
         f_normal = cell.face_normal(fkey)
@@ -311,10 +312,62 @@ def check_cell_convexity(cell):
     return True
 
 
-def cells_face_subdivide_barycentric(cell, fkey, cls=None):
-    """Volmesh face subdivision
+def cell_subdivide_barycentric(cell, k=1, cls=None):
+    """cell: mesh / mesh3gs, external equilibrium
     """
-    raise NotImplementedError
+    from compas_3gs.datastructures import VolMesh3gs
+    from copy import deepcopy
+
+    if cls is None:
+        cls = VolMesh3gs()
+
+    vertices = []
+    cells = []
+    vertices_dict = {}
+
+    for vkey in cell.vertices():
+        if cell.vertex_coordinates(vkey) not in vertices:
+            vertices_dict[vkey] = len(vertices)
+            vertices.append(cell.vertex_coordinates(vkey))
+        else:
+            vertices_dict[vkey] = vertices.index(cell.vertex_coordinates(vkey))
+
+    points = [cell.vertex_coordinates(key) for key in cell.vertices()]
+    cell_centroid = cg.centroid_points(points)
+
+    c_center_key = len(vertices)  # vertex key of the cell center
+    vertices.append(cell_centroid)
+
+    for fkey in cell.faces():
+        faces = []
+        faces.append([vertices_dict[vkey] for vkey in cell.face_vertices(fkey)])
+        for u, v in cell.face_halfedges(fkey):
+            faces.append([vertices_dict[v], vertices_dict[u], c_center_key])
+        cells.append(faces)
+
+    volmesh = cls.from_vertices_and_cells(vertices, cells)
+
+    if k > 1:
+        for i in range(k - 1):
+            ckeys = deepcopy(list(volmesh.cells()))
+            for ckey in ckeys:
+                x, y, z   = volmesh.cell_center(ckey)
+                w         = volmesh.add_vertex(x=x, y=y, z=z)
+                halffaces = volmesh.cell_halffaces(ckey)
+
+                for hfkey in halffaces:
+                    cell_halffaces = [volmesh.halfface_vertices(hfkey)]
+                    halfedges = volmesh.halfface_halfedges(hfkey)
+
+                    for u, v in halfedges:
+                        cell_halffaces.append([w, v, u])
+
+                    volmesh.delete_halfface(hfkey)
+                    volmesh.add_cell(cell_halffaces)
+            
+            for ckey in ckeys:
+                del volmesh.cell[ckey]
+    return volmesh
 
 
 
