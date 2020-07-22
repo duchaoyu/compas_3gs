@@ -1,4 +1,8 @@
 {
+<<<<<<< HEAD
     "restructuredtext.confPath": "${workspaceFolder}/docsource/conf.py",
     "python.pythonPath": "C:\\Users\\duch\\Anaconda3\\envs\\3gs\\python.exe"
+=======
+    "restructuredtext.confPath": "${workspaceFolder}/docsource/conf.py"
+>>>>>>> 584331387c8b670cd9258e4c252df49c39192943
 }

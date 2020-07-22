@@ -24,10 +24,14 @@ __all__ = ['cell_split_indet_face_vertices',
 
            'cell_relocate_face',
            'cell_face_subdivide_barycentric',
+<<<<<<< HEAD
            'cell_merge_coplanar_adjacent_faces',
            'cell_subdivide_barycentric', 
 
            'check_cell_convexity']
+=======
+           'cell_merge_coplanar_adjacent_faces']
+>>>>>>> 584331387c8b670cd9258e4c252df49c39192943
 
 
 # ******************************************************************************
@@ -131,8 +135,8 @@ def cell_collapse_short_edge(cell, u, v, min_length=0.1):
 
     if dist < min_length:
         mp = midpoint_point_point(sp, ep)
-        cell.vertex_attributes(u, 'xyz', mp)
-        cell.vertex_attributes(v, 'xyz', mp)
+        cell.vertex_update_xyz(u, mp)
+        cell.vertex_update_xyz(v, mp)
 
     return cell
 
@@ -241,6 +245,7 @@ def cell_merge_coplanar_adjacent_faces(cell, tol=0.001):
     return cell
 
 
+<<<<<<< HEAD
 def cell_face_subdivide_barycentric(cell, fkey, cls=None):
     # the cell should be a tetrahedral / pyramid shape polyhedron? 
     from compas_3gs.datastructures import VolMesh3gs
@@ -368,7 +373,10 @@ def cell_subdivide_barycentric(cell, k=1, cls=None):
             for ckey in ckeys:
                 del volmesh.cell[ckey]
     return volmesh
-
+=======
+def cell_face_subdivide_barycentric(cell, fkey):
+    raise NotImplementedError
+>>>>>>> 584331387c8b670cd9258e4c252df49c39192943
 
 
 # ******************************************************************************
