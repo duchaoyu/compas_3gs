@@ -19,7 +19,7 @@ from compas_3gs.algorithms import cell_arearise_face
 from compas_3gs.diagrams import Cell
 from compas_3gs.operations import cell_relocate_face
 from compas_3gs.rhino import MeshConduit
-from compas_3gs.datastructures import Mesh3gsArtist
+from compas_3gs.rhino1 import Mesh3gsArtist
 
 try:
     import rhinoscriptsyntax as rs

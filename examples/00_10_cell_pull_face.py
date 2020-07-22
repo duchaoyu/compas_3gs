@@ -11,7 +11,7 @@ from compas_rhino.geometry import RhinoSurface
 from compas_3gs.diagrams import Cell
 from compas_3gs.rhino import rhino_cell_face_pull
 
-from compas_3gs.datastructures import Mesh3gsArtist
+from compas_3gs.rhino import Mesh3gsArtist
 
 
 try:
