@@ -6,30 +6,23 @@ import compas
 
 from compas.geometry import add_vectors
 
-from compas_rhino.objects.selectors import VertexSelector
-
 from compas_3gs.rhino.control import get_initial_point
+
 
 try:
     import Rhino
 
-    from Rhino.ApplicationSettings import *
+    from Rhino.ApplicationSettings import ModelAidSettings
     from Rhino.Geometry import Point3d
 
     from System.Drawing.Color import FromArgb
 
     dotted_color = FromArgb(0, 0, 0)
-    arrow_color  = FromArgb(255, 0, 79)
-    edge_color   = FromArgb(0, 0, 0)
+    arrow_color = FromArgb(255, 0, 79)
+    edge_color = FromArgb(0, 0, 0)
 
 except ImportError:
     compas.raise_if_ironpython()
-
-
-__author__     = 'Juney Lee'
-__copyright__  = 'Copyright 2019, BLOCK Research Group - ETH Zurich'
-__license__    = 'MIT License'
-__email__      = 'juney.lee@arch.ethz.ch'
 
 
 __all__ = ['rhino_vertex_modify_fixity',
@@ -48,12 +41,10 @@ __all__ = ['rhino_vertex_modify_fixity',
 # ******************************************************************************
 
 
-def rhino_vertex_modify_fixity(diagram):
+def rhino_vertex_modify_fixity(diagram, vertices):
     """Modifies the fixity attribute(s) of selected vertices.
 
     """
-
-    vkeys = VertexSelector.select_vertices(diagram)
 
     go = Rhino.Input.Custom.GetOption()
     go.SetCommandPrompt('Set axes Constraints')
@@ -76,60 +67,57 @@ def rhino_vertex_modify_fixity(diagram):
             continue
         break
 
-    if not vkeys:
+    if not vertices:
         return
 
-    for vkey in vkeys:
+    for vertex in vertices:
         if boolOptionA.CurrentValue:
-            diagram.vertex[vkey]['x_fix'] = True
-            diagram.vertex[vkey]['y_fix'] = True
-            diagram.vertex[vkey]['z_fix'] = True
+            diagram.vertex_attribute(vertex, 'x_fix', True)
+            diagram.vertex_attribute(vertex, 'y_fix', True)
+            diagram.vertex_attribute(vertex, 'z_fix', True)
+
         else:
-            diagram.vertex[vkey]['x_fix'] = boolOptionX.CurrentValue
-            diagram.vertex[vkey]['y_fix'] = boolOptionY.CurrentValue
-            diagram.vertex[vkey]['z_fix'] = boolOptionZ.CurrentValue
-
-    diagram.draw(layer=diagram.layer)
+            diagram.vertex_attribute(vertex, 'x_fix', boolOptionX.CurrentValue)
+            diagram.vertex_attribute(vertex, 'y_fix', boolOptionY.CurrentValue)
+            diagram.vertex_attribute(vertex, 'z_fix', boolOptionZ.CurrentValue)
 
 
-def rhino_vertex_move(diagram):
+def rhino_vertex_move(diagram, vertices):
     """Moves the selected vertices.
 
     """
 
-    vkeys = VertexSelector.select_vertices(diagram)
-
     nbr_vkeys = {}
     edges = set()
-    for vkey in vkeys:
-        all_nbrs = diagram.vertex_neighbors(vkey)
+    for vertex in vertices:
+        all_nbrs = diagram.vertex_neighbors(vertex)
         nbrs = []
         for nbr in all_nbrs:
-            if nbr in vkeys:
-                edges.add(frozenset([vkey, nbr]))
+            if nbr in vertices:
+                edges.add(frozenset([vertex, nbr]))
             else:
                 nbrs.append(nbr)
-        nbr_vkeys[vkey] = nbrs
+        nbr_vkeys[vertex] = nbrs
 
     ip = get_initial_point()
 
     def OnDynamicDraw(sender, e):
         cp = e.CurrentPoint
         translation = cp - ip
-        for vkey in vkeys:
-            xyz = diagram.vertex_coordinates(vkey)
-            sp  = Point3d(*xyz)
-            for nbr_vkey in nbr_vkeys[vkey]:
-                nbr  = diagram.vertex_coordinates(nbr_vkey)
-                np   = Point3d(*nbr)
+        for vertex in vertices:
+            xyz = diagram.vertex_coordinates(vertex)
+            sp = Point3d(*xyz)
+            for nbr_vkey in nbr_vkeys[vertex]:
+                nbr = diagram.vertex_coordinates(nbr_vkey)
+                np = Point3d(*nbr)
                 line = Rhino.Geometry.Line(sp, sp + translation)
                 e.Display.DrawDottedLine(np, sp + translation, dotted_color)
                 e.Display.DrawArrow(line, arrow_color, 15, 0)
 
         for pair in list(edges):
             pair = list(pair)
-            u  = diagram.vertex_coordinates(pair[0])
-            v  = diagram.vertex_coordinates(pair[1])
+            u = diagram.vertex_coordinates(pair[0])
+            v = diagram.vertex_coordinates(pair[1])
             sp = Point3d(*u) + translation
             ep = Point3d(*v) + translation
             e.Display.DrawLine(sp, ep, edge_color, 3)
@@ -138,11 +126,11 @@ def rhino_vertex_move(diagram):
     gp = Rhino.Input.Custom.GetPoint()
     gp.DynamicDraw += OnDynamicDraw
     gp.SetCommandPrompt('Point to move to')
-    ortho_option = Rhino.Input.Custom.OptionToggle(True, 'Off', 'On')
+    ortho_option = Rhino.Input.Custom.OptionToggle(False, 'Off', 'On')
     gp.AddOptionToggle('ortho_snap', ortho_option)
 
     while True:
-        # ModelAidSettings.Ortho = ortho_option.CurrentValue
+        ModelAidSettings.Ortho = ortho_option.CurrentValue
         get_rc = gp.Get()
         gp.SetBasePoint(ip, False)
         if gp.CommandResult() != Rhino.Commands.Result.Success:
@@ -154,19 +142,14 @@ def rhino_vertex_move(diagram):
         break
 
     translation = target - ip
-    for vkey in vkeys:
-        new_xyz = add_vectors(diagram.vertex_coordinates(vkey), translation)
-        diagram.vertex_update_xyz(vkey, new_xyz, constrained=False)
-
-    diagram.draw()
+    for vertex in vertices:
+        new_xyz = add_vectors(diagram.vertex_coordinates(vertex), translation)
+        diagram.vertex_update_xyz(vertex, new_xyz, constrained=False)
 
 
-def rhino_vertex_align(diagram):
+def rhino_vertex_align(diagram, vertices):
 
     def update_point(old, new):
-        if boolOptionA.CurrentValue is True:
-            return new
-
         if boolOptionX.CurrentValue is True:
             old[0] = new[0]
         if boolOptionY.CurrentValue is True:
@@ -178,31 +161,29 @@ def rhino_vertex_align(diagram):
     # --------------------------------------------------------------------------
     # get vkeys to align
     # --------------------------------------------------------------------------
-    vkeys = VertexSelector.select_vertices(diagram)
+
     nbr_vkeys = {}
     edges = set()
-    for vkey in vkeys:
-        all_nbrs = diagram.plane[vkey].keys()
+    for vertex in vertices:
+        all_nbrs = diagram.vertex_neighbors(vertex)
         nbrs = []
         for nbr in all_nbrs:
-            if nbr in vkeys:
-                edges.add(frozenset([vkey, nbr]))
+            if nbr in vertices:
+                edges.add(frozenset([vertex, nbr]))
             else:
                 nbrs.append(nbr)
-        nbr_vkeys[vkey] = nbrs
+        nbr_vkeys[vertex] = nbrs
 
     # --------------------------------------------------------------------------
     # get rhino point
     # --------------------------------------------------------------------------
-    gp   = Rhino.Input.Custom.GetPoint()
+    gp = Rhino.Input.Custom.GetPoint()
     gp.SetCommandPrompt('Set alignment Constraints')
 
-    boolOptionA = Rhino.Input.Custom.OptionToggle(False, 'False', 'True')
     boolOptionX = Rhino.Input.Custom.OptionToggle(False, 'False', 'True')
     boolOptionY = Rhino.Input.Custom.OptionToggle(False, 'False', 'True')
     boolOptionZ = Rhino.Input.Custom.OptionToggle(False, 'False', 'True')
 
-    gp.AddOptionToggle('A', boolOptionA)
     gp.AddOptionToggle('X', boolOptionX)
     gp.AddOptionToggle('Y', boolOptionY)
     gp.AddOptionToggle('Z', boolOptionZ)
@@ -210,20 +191,20 @@ def rhino_vertex_align(diagram):
     def OnDynamicDraw(sender, e):
         cp = e.CurrentPoint
 
-        for vkey in vkeys:
-            xyz = diagram.vertex_coordinates(vkey)
-            sp  = Point3d(*xyz)
+        for vertex in vertices:
+            xyz = diagram.vertex_coordinates(vertex)
+            sp = Point3d(*xyz)
             sp_f = update_point(sp, cp)
-            for nbr_vkey in nbr_vkeys[vkey]:
-                nbr  = diagram.vertex_coordinates(nbr_vkey)
-                np   = Point3d(*nbr)
+            for nbr_vkey in nbr_vkeys[vertex]:
+                nbr = diagram.vertex_coordinates(nbr_vkey)
+                np = Point3d(*nbr)
                 e.Display.DrawDottedLine(np, sp_f, dotted_color)
                 e.Display.DrawLine(sp, sp_f, edge_color, 3)
 
         for pair in list(edges):
             pair = list(pair)
-            u  = diagram.vertex_coordinates(pair[0])
-            v  = diagram.vertex_coordinates(pair[1])
+            u = diagram.vertex_coordinates(pair[0])
+            v = diagram.vertex_coordinates(pair[1])
             sp = update_point(Point3d(*u), cp)
             ep = update_point(Point3d(*v), cp)
             e.Display.DrawLine(sp, ep, edge_color, 3)
@@ -241,11 +222,9 @@ def rhino_vertex_align(diagram):
             target = gp.Point()
         break
 
-    for vkey in vkeys:
-        xyz = update_point(diagram.vertex_coordinates(vkey), target)
-        diagram.vertex_update_xyz(vkey, xyz, constrained=False)
-
-    diagram.draw()
+    for vertex in vertices:
+        xyz = update_point(diagram.vertex_coordinates(vertex), target)
+        diagram.vertex_update_xyz(vertex, xyz, constrained=False)
 
 
 # ******************************************************************************
@@ -261,7 +240,7 @@ def rhino_vertex_align(diagram):
 
 # def network_vertex_fixity(network):
 
-#     vkeys = VertexSelector.select_vertices(network)
+#     vkeys = mesh_select_vertices(network)
 
 #     go = Rhino.Input.Custom.GetOption()
 #     go.SetCommandPrompt('Set axes Constraints')
@@ -303,7 +282,7 @@ def rhino_vertex_align(diagram):
 
 # def network_vertex_move(network):
 
-#     vkeys = VertexSelector.select_vertices(network)
+#     vkeys = mesh_select_vertices(network)
 
 #     nbr_vkeys = {}
 #     edges = set()

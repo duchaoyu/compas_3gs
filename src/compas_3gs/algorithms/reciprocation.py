@@ -6,18 +6,13 @@ from compas.geometry import normalize_vector
 from compas.geometry import scale_vector
 from compas.geometry import add_vectors
 from compas.geometry import dot_vectors
+from compas.geometry import angle_vectors
 from compas.geometry import length_vector
 from compas.geometry import centroid_points
 
 from compas_3gs.algorithms import volmesh_planarise
 
 from compas_3gs.utilities import print_result
-
-
-__author__     = 'Juney Lee'
-__copyright__  = 'Copyright 2019, BLOCK Research Group - ETH Zurich'
-__license__    = 'MIT License'
-__email__      = 'juney.lee@arch.ethz.ch'
 
 
 __all__ = ['volmesh_reciprocate']
@@ -31,11 +26,11 @@ def volmesh_reciprocate(volmesh,
 
                         fix_vkeys=[],
 
-                        edge_min=None,
-                        edge_max=None,
+                        edge_min=0.1,
+                        edge_max=10000,
 
-                        tolerance=0.001,
-                        tolerance_boundary=0.0001,
+                        tolerance=1.0,
+                        tolerance_boundary=1.0,
 
                         callback=None,
                         callback_args=None,
@@ -87,6 +82,7 @@ def volmesh_reciprocate(volmesh,
             raise Exception('Callback is not callable.')
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     free_vkeys   = list(set(formdiagram.nodes()) - set(fix_vkeys))
 =======
     free_vkeys   = list(set(formdiagram.vertex) - set(fix_vkeys))
@@ -97,6 +93,13 @@ def volmesh_reciprocate(volmesh,
     boundary_fkeys  = volmesh.halffaces_on_boundary()
 <<<<<<< HEAD
 =======
+=======
+    free_vkeys = list(set(formdiagram.vertices()) - set(fix_vkeys))
+
+    init_normals = {fkey: volmesh.halfface_normal(fkey) for fkey in volmesh.faces()}
+
+    boundary_fkeys = volmesh.halffaces_on_boundaries()
+>>>>>>> upstream/master
 
 >>>>>>> 584331387c8b670cd9258e4c252df49c39192943
     # --------------------------------------------------------------------------
@@ -106,12 +109,12 @@ def volmesh_reciprocate(volmesh,
     target_normals = {}
 
     for u, v in formdiagram.edges():
-        u_hfkey     = volmesh.cell_pair_halffaces(u, v)[0]
-        face_normal = scale_vector(volmesh.halfface_oriented_normal(u_hfkey), weight)
+        u_hfkey = volmesh.cell_pair_halffaces(u, v)[0]
+        face_normal = scale_vector(volmesh.halfface_normal(u_hfkey), weight)
         edge_vector = scale_vector(formdiagram.edge_vector(u, v), 1 - weight)
-        target      = normalize_vector(add_vectors(face_normal, edge_vector))
-        target_vectors[(u, v)]  = {'fkey'  : u_hfkey,
-                                   'target': target}
+        target = normalize_vector(add_vectors(face_normal, edge_vector))
+        target_vectors[(u, v)] = {'fkey': u_hfkey,
+                                  'target': target}
         target_normals[u_hfkey] = target
 
     for fkey in boundary_fkeys:
@@ -132,25 +135,35 @@ def volmesh_reciprocate(volmesh,
         # ----------------------------------------------------------------------
         if weight != 0:
 
-            new_form_xyz = {vkey: [] for vkey in formdiagram.vertex}
+            new_form_xyz = {vkey: [] for vkey in formdiagram.vertices()}
 
             for u, v in target_vectors:
                 target_v = target_vectors[(u, v)]['target']
 <<<<<<< HEAD
+<<<<<<< HEAD
                 edge_v   = formdiagram.edge_vector(u, v)
 =======
                 edge_v   = formdiagram.edge_vector(u, v, unitized=False)
+=======
+                edge_v = formdiagram.edge_vector(u, v, unitized=False)
+>>>>>>> upstream/master
 
 >>>>>>> 584331387c8b670cd9258e4c252df49c39192943
                 # target edge length -------------------------------------------
                 l = length_vector(edge_v)
 
+                l_min = formdiagram.edge_attribute((u, v), 'l_min')
+                l_max = formdiagram.edge_attribute((u, v), 'l_max')
+
                 # min edge
+<<<<<<< HEAD
 <<<<<<< HEAD
                 l_min = formdiagram.edge_attribute([u, v], 'l_min')
 =======
                 l_min = formdiagram.edge[u][v]['l_min']
 >>>>>>> 584331387c8b670cd9258e4c252df49c39192943
+=======
+>>>>>>> upstream/master
                 if edge_min:
                     l_min = edge_min
                 if l < l_min:
@@ -158,10 +171,13 @@ def volmesh_reciprocate(volmesh,
 
                 # max edge
 <<<<<<< HEAD
+<<<<<<< HEAD
                 l_max = formdiagram.edge_attribute([u, v], 'l_max')
 =======
                 l_max = formdiagram.edge[u][v]['l_max']
 >>>>>>> 584331387c8b670cd9258e4c252df49c39192943
+=======
+>>>>>>> upstream/master
                 if edge_max:
                     l_max = edge_max
                 if l > l_max:
@@ -211,7 +227,8 @@ def volmesh_reciprocate(volmesh,
         for fkey in boundary_fkeys:
             f_normal = volmesh.halfface_normal(fkey)
             target_normal = target_normals[fkey]
-            b_perpness = 1 - abs(dot_vectors(f_normal, target_normal))
+            b_perpness = angle_vectors(f_normal, target_normal, deg=True)
+            # 1 - abs(dot_vectors(f_normal, target_normal))
 
             if b_perpness > deviation_boundary_perp:
                 deviation_boundary_perp = b_perpness
@@ -260,10 +277,11 @@ def _check_deviation(volmesh, network):
     deviation = 0
     for u, v in network.edges():
         u_hf, v_hf = volmesh.cell_pair_halffaces(u, v)
-        normal = volmesh.halfface_oriented_normal(u_hf)
-        edge   = network.edge_vector(u, v, unitized=True)
-        dot    = dot_vectors(normal, edge)
-        perp_check = 1 - abs(dot)
+        normal = volmesh.halfface_normal(u_hf)
+        edge = network.edge_vector(u, v, unitized=True)
+        perp_check = angle_vectors(normal, edge, deg=True)
+        # dot = dot_vectors(normal, edge)
+        # perp_check = 1 - abs(dot)
         if perp_check > deviation:
             deviation = perp_check
     return deviation

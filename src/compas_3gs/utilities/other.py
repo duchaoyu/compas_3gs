@@ -12,12 +12,6 @@ from compas.utilities import i_to_red
 from compas_3gs.utilities.topology import pair_uv_to_hf
 
 
-__author__     = 'Juney Lee'
-__copyright__  = 'Copyright 2019, BLOCK Research Group - ETH Zurich'
-__license__    = 'MIT License'
-__email__      = 'juney.lee@arch.ethz.ch'
-
-
 __all__ = ['get_index_colordict',
            'valuedict_to_colordict',
            'compare_initial_current',
@@ -65,9 +59,9 @@ def get_index_colordict(key_list, color_scheme=i_to_rgb):
             if len(key_list) == 1:
                 value = 1
             else:
-                value  = float(index) / (len(key_list) - 1)
+                value = float(index) / (len(key_list) - 1)
 
-            color  = color_scheme(value)
+            color = color_scheme(value)
             c_dict[key] = color
 
     return c_dict
@@ -96,8 +90,8 @@ def valuedict_to_colordict(value_dict, color_scheme=i_to_rgb):
 
     for key in value_dict:
 
-        value       = (value_dict[key] - lb) / (ub - lb)
-        color       = color_scheme(value)
+        value = (value_dict[key] - lb) / (ub - lb)
+        color = color_scheme(value)
         c_dict[key] = color
 
     return c_dict
@@ -143,16 +137,17 @@ def get_force_mags(volmesh, network):
     """Returns a dictionary of (u,v)-magnitude pairs.
     Negative magnitude means compression, while positive magnitude means tension.
     """
+
     uv_hf_dict = pair_uv_to_hf(network, volmesh)
 
     mags = {}
 
     for u, v in network.edges():
-        hfkey       = uv_hf_dict[(u, v)]
+        hfkey = uv_hf_dict[(u, v)]
         edge_vector = network.edge_vector(u, v)
-        face_normal = volmesh.halfface_oriented_normal(hfkey)
-        face_area   = volmesh.halfface_oriented_area(hfkey)
-        dot         = dot_vectors(face_normal, edge_vector)
+        face_normal = volmesh.halfface_normal(hfkey)
+        face_area = volmesh.halfface_area(hfkey)
+        dot = dot_vectors(face_normal, edge_vector)
 
         if dot < 0:
             factor = -1
@@ -160,7 +155,7 @@ def get_force_mags(volmesh, network):
         if dot > 0:
             factor = 1
 
-        force = face_area * factor
+        force = face_area * factor * volmesh.attributes['convention']
 
         mags[(u, v)] = force
 
@@ -174,8 +169,8 @@ def get_force_colors_uv(volmesh,
     """Returns a dictionary of (u,v)-color pairs.
     Blue means compression, and red means tension.
     """
-    c_dict  = {}
-    f_dict  = get_force_mags(volmesh, network)
+    c_dict = {}
+    f_dict = get_force_mags(volmesh, network)
     f_range = sorted(f_dict.values())
 
     c_forces = [x for x in f_range if x < 0]
@@ -183,7 +178,6 @@ def get_force_colors_uv(volmesh,
 
     for edge in f_dict:
         force = f_dict[edge]
-
         if force < 0:  # if compression
             color = (0, 0, 255)
             if gradient:
@@ -198,7 +192,7 @@ def get_force_colors_uv(volmesh,
                 max_t = t_forces[-1]
                 color = i_to_red((force - min_t) / (max_t - min_t))
 
-        if force == 0 or force < tol:  # if close to zero
+        if abs(force) < tol:  # if close to zero
             color = (255, 255, 255)
 
         c_dict[edge] = color
@@ -231,8 +225,8 @@ def get_force_colors_hf(volmesh,
 
     # boundary halffaces -------------------------------------------------------
     if boundary:
-        b_hfkeys = volmesh.halffaces_on_boundary()
-        b_hf_areas = {hfkey: volmesh.halfface_oriented_area(hfkey) for hfkey in b_hfkeys}
+        b_hfkeys = volmesh.halffaces_on_boundaries()
+        b_hf_areas = {hfkey: volmesh.halfface_area(hfkey) for hfkey in b_hfkeys}
         b_hf_c_dict = valuedict_to_colordict(b_hf_areas,
                                              color_scheme=i_to_green)
         for hfkey in b_hfkeys:
